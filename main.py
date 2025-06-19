@@ -1,73 +1,66 @@
 import os
-from flask import Flask, request, send_file, jsonify
-import replicate
 import requests
+import replicate
+from flask import Flask, request, send_file, jsonify
 
 app = Flask(__name__)
-replicate_client = replicate.Client(api_token=os.environ["REPLICATE_API_TOKEN"])
 
-@app.route('/generate', methods=['POST'])
+# Read Replicate API token from Render env variable
+replicate_api_token = os.environ.get("REPLICATE_API_TOKEN")
+replicate_client = replicate.Client(api_token=replicate_api_token)
+
+@app.route("/")
+def home():
+    return "👄 Lip-Sync API is Live"
+
+@app.route("/generate", methods=["POST"])
 def generate():
-    data = request.json
-    image_url = data.get('image_url')
-    audio_url = data.get('audio_url')
+    try:
+        data = request.get_json()
 
-    if not image_url or not audio_url:
-        return jsonify({'error': 'image_url and audio_url required'}), 400
+        image_url = data.get("image_url")
+        audio_url = data.get("audio_url")
 
-    # Fetch image and save it
-    img_response = requests.get(image_url)
-    if img_response.status_code != 200:
-        return jsonify({'error': 'Failed to fetch image from URL'}), 400
-    with open('face.jpg', 'wb') as f:
-        f.write(img_response.content)
+        if not image_url or not audio_url:
+            return jsonify({"error": "Missing 'image_url' or 'audio_url'"}), 400
 
-    # Fetch audio and save it
-    aud_response = requests.get(audio_url)
-    if aud_response.status_code != 200:
-        return jsonify({'error': 'Failed to fetch audio from URL'}), 400
-    with open('voice.wav', 'wb') as f:
-        f.write(aud_response.content)
+        # Download image
+        img_response = requests.get(image_url)
+        with open("face.jpg", "wb") as f:
+            f.write(img_response.content)
 
-    # Run the first-order-model to animate the image
-    # Note: The 'driving_video' is also set to 'face.jpg' here.
-    # If you intend to use an actual driving video, you would need to fetch that too.
-    animation_output = replicate_client.run(
-           "ali-siarohin/first-order-model:6fdf6c346df2441f875b7b93aeb60b3913ecb5c20b29f20a606d8903e1c00cf3",
-        input={
-            "image": open('face.jpg', 'rb'),
-            "driving_video": open('face.jpg', 'rb')
-        }
-    )
+        # Download audio
+        audio_response = requests.get(audio_url)
+        with open("voice.wav", "wb") as f:
+            f.write(audio_response.content)
 
-    # Ensure the animation output contains a video URL
-    if not animation_output or 'video' not in animation_output:
-        return jsonify({'error': 'First-order-model did not return a video'}), 500
+        print("✅ Inputs downloaded. Sending to Replicate...")
 
-    # Run wav2lip to synchronize audio with the animated video
-    final_output = replicate_client.run(
-          "devxpy/cog-wav2lip:8d65e3f4",
-        input={
-            "video": open(animation_output['video'], 'rb'),
-            "audio": open('voice.wav', 'rb')
-        }
-    )
+        # Run Replicate model
+        output = replicate_client.run(
+            "devxpy/cog-wav2lip:8d65e3f4f4298520e079198b493c25adfc43c058ffec924f2aefc8010ed25eef",
+            input={
+                "face": open("face.jpg", "rb"),
+                "audio": open("voice.wav", "rb"),
+                "fps": 25
+            }
+        )
 
-    # Ensure the final output contains a video URL
-    if not final_output or 'output' not in final_output:
-        return jsonify({'error': 'Wav2lip model did not return a video output'}), 500
+        print("🎬 Video generated:", output)
 
-    video_url = final_output['output']
-    
-    # Fetch the final generated video
-    result_response = requests.get(video_url)
-    if result_response.status_code != 200:
-        return jsonify({'error': 'Failed to fetch final video from Replicate'}), 500
-    with open('output.mp4', 'wb') as f:
-        f.write(result_response.content)
+        # Download video from returned URL
+        video_url = output
+        video_data = requests.get(video_url)
 
-    return send_file('output.mp4', mimetype='video/mp4')
+        with open("output.mp4", "wb") as f:
+            f.write(video_data.content)
 
-# Optional: Add a main block to run the Flask app if this file is executed directly
-if __name__ == '__main__':
-    app.run(host="0.0.0.0", port=5000)
+        return send_file("output.mp4", mimetype="video/mp4")
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+
+if __name__ == "__main__":
+    app.run(debug=True)
