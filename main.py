@@ -33,7 +33,7 @@ def generate():
     # Note: The 'driving_video' is also set to 'face.jpg' here.
     # If you intend to use an actual driving video, you would need to fetch that too.
     animation_output = replicate_client.run(
-        "ali-siarohin/first-order-model:latest",
+          "ali-siarohin/first-order-model:6fdf6c346df2441f875b7b93aeb60b3913ecb5c20b29f20a606d8903e1c00cf3",
         input={
             "image": open('face.jpg', 'rb'),
             "driving_video": open('face.jpg', 'rb')
@@ -46,7 +46,7 @@ def generate():
 
     # Run wav2lip to synchronize audio with the animated video
     final_output = replicate_client.run(
-        "pmpromonet/wav2lip:latest",
+         "pmpromonet/wav2lip:fbc6f49a70c8c3b372ddfddc7a7a6d1f8046aa7b5f07b5d1bce550004e52c5a1",
         input={
             "video": open(animation_output['video'], 'rb'),
             "audio": open('voice.wav', 'rb')
