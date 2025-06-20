@@ -39,7 +39,7 @@ def generate():
         if response.status_code != 200:
             return jsonify({"error": response.text}), response.status_code
 
-        video_id = response.json().get("videoId")
+        video_id = response.json().get("video", {}).get("id")
         if not video_id:
             return jsonify({"error": "Missing video ID in response"}), 500
 
