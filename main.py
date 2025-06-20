@@ -7,7 +7,7 @@ app = Flask(__name__)
 # ⚠️ Hardcoded Elai API Token — update this later to use environment variables for safety
 ELAI_API_TOKEN = "o4YU9YBUwEMhBs3y2U34OZ7bwzZ0fSEJ"
 ELAI_AVATAR_ID = "6282089e661f88f4779b815f"  # Default Elai avatar
-ELAI_API_URL = "https://apis.elai.io/api/v1/videos/render"
+ELAI_API_URL = "https://apis.elai.io/api/v1/videos"
 
 headers = {
     "Authorization": f"Bearer {ELAI_API_TOKEN}",
