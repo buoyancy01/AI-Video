@@ -4,9 +4,9 @@ from flask import Flask, request, jsonify, send_file
 
 app = Flask(__name__)
 
-# 🔐 Replace this with your actual Elai API token
+# 🔐 Hardcoded API Token — use env var in production
 ELAI_API_TOKEN = "o4YU9YBUwEMhBs3y2U34OZ7bwzZ0fSEJ"
-ELAI_AVATAR_ID = "6282089e661f88f4779b815f"  # Replace if needed
+ELAI_AVATAR_ID = "6282089e661f88f4779b815f"
 ELAI_API_URL = "https://apis.elai.io/api/v1/videos"
 
 headers = {
@@ -18,7 +18,6 @@ headers = {
 def generate():
     try:
         data = request.get_json()
-
         script_text = data.get("script", "This is Elai in action.")
         voice = data.get("voice", "en-US-Wavenet-A")
         language = data.get("language", "en")
@@ -32,35 +31,40 @@ def generate():
             "language": language
         }
 
-        # Step 1: Trigger video generation
+        # Step 1: Send creation request
         response = requests.post(ELAI_API_URL, headers=headers, json=payload)
         print("▶️ Elai API Request:", response.status_code, response.text)
 
         if response.status_code != 200:
             return jsonify({"error": response.text}), response.status_code
 
-        video_id = response.json().get("video", {}).get("id")
-        if not video_id:
-            return jsonify({"error": "Missing video ID in response"}), 500
+        # Step 2: Wait 2 seconds before listing videos
+        time.sleep(2)
+        list_resp = requests.get(ELAI_API_URL, headers=headers).json()
 
-        # Step 2: Poll video status
+        if not list_resp or not isinstance(list_resp, list) or not list_resp[0].get("id"):
+            return jsonify({"error": "Could not retrieve video ID"}), 500
+
+        video_id = list_resp[0]["id"]
+        print(f"🎥 Fetched latest video ID: {video_id}")
+
+        # Step 3: Poll for video completion
         status_url = f"{ELAI_API_URL}/{video_id}"
-        print(f"⏳ Waiting on video ID: {video_id}")
 
         while True:
             status_resp = requests.get(status_url, headers=headers).json()
-            status = status_resp.get("status", "unknown")
+            status = status_resp.get("status")
 
             if status == "completed":
-                video_url = status_resp["videoUrl"]
+                video_url = status_resp.get("videoUrl")
                 break
             elif status == "failed":
                 return jsonify({"error": "Video generation failed"}), 500
 
-            print("⌛ Status:", status)
+            print(f"⌛ Status: {status}")
             time.sleep(5)
 
-        # Step 3: Download video
+        # Step 4: Download and return video
         video_data = requests.get(video_url)
         with open("elai_output.mp4", "wb") as f:
             f.write(video_data.content)
