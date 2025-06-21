@@ -81,7 +81,7 @@ def generate():
             return jsonify({"error": response.text}), response.status_code
 
         creation_data = response.json()
-        video_id = creation_data.get("id")
+        video_id = creation_data.get("video", {}).get("id")
         if not video_id:
             return jsonify({"error": "Could not retrieve video ID from creation response"}), 500
 
