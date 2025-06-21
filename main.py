@@ -4,7 +4,7 @@ from flask import Flask, request, jsonify, send_file
 
 app = Flask(__name__)
 
-# Replace these with your actual API token and (if needed) avatar values.
+# Replace with your valid Elai API token
 ELAI_API_TOKEN = "o4YU9YBUwEMhBs3y2U34OZ7bwzZ0fSEJ"
 ELAI_API_URL = "https://apis.elai.io/api/v1/videos"
 
@@ -13,10 +13,10 @@ headers = {
     "Content-Type": "application/json"
 }
 
-# Example slide structure (edit as needed)
 def build_slide(speech_text):
+    # Generates a slide structure matching the Elai UI export
     return {
-        "id": int(time.time() * 1000),  # generate a unique numeric id per slide
+        "id": int(time.time() * 1000),  # Unique numeric ID per slide
         "speech": speech_text,
         "avatar": {
             "code": "neyson.business",
@@ -54,7 +54,7 @@ def build_slide(speech_text):
                 }
             ]
         },
-        "duration": 6.384,
+        "duration": 6.384
     }
 
 @app.route('/generate', methods=['POST'])
@@ -72,6 +72,10 @@ def generate():
         # Step 1: Send creation request
         response = requests.post(ELAI_API_URL, headers=headers, json=payload)
         print("▶️ Elai API Request:", response.status_code, response.text)
+        try:
+            print("▶️ Elai API JSON:", response.json())
+        except Exception as e:
+            print("▶️ Could not decode JSON:", e)
 
         if response.status_code != 200:
             return jsonify({"error": response.text}), response.status_code
