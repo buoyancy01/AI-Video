@@ -1,122 +1,75 @@
 import time
 import requests
-from flask import Flask, request, jsonify, send_file
+from flask import Flask, request, jsonify, send_file, abort
 
 app = Flask(__name__)
 
-# Replace with your valid Elai API token
+# 🔐 For now we hardcode—swap to os.getenv("ELAI_API_TOKEN") in prod
 ELAI_API_TOKEN = "o4YU9YBUwEMhBs3y2U34OZ7bwzZ0fSEJ"
+ELAI_AVATAR_ID = "6282089e661f88f4779b815f"
 ELAI_API_URL = "https://apis.elai.io/api/v1/videos"
 
-headers = {
+HEADERS = {
     "Authorization": f"Bearer {ELAI_API_TOKEN}",
     "Content-Type": "application/json"
 }
 
-def build_slide(speech_text):
-    # Generates a slide structure matching the Elai UI export
-    return {
-        "id": int(time.time() * 1000),  # Unique numeric ID per slide
-        "speech": speech_text,
-        "avatar": {
-            "code": "neyson.business",
-            "name": "Neyson Business",
-            "canvas": "https://d3u63mhbhkevz8.cloudfront.net/common/neyson/business/neyson.png",
-            "gender": "male",
-            "limit": 300
-        },
-        "language": "English",
-        "voice": "en-US-AndrewMultilingualNeural:default",
-        "voiceProvider": "azure",
-        "voiceType": "text",
-        "animation": "fade_in",
-        "canvas": {
-            "version": "4.4.0",
-            "background": "#ffffff",
-            "objects": [
-                {
-                    "type": "avatar",
-                    "left": 151.5,
-                    "top": 36,
-                    "width": 0,
-                    "height": 0,
-                    "fill": "#4868FF",
-                    "scaleX": 0.3,
-                    "scaleY": 0.3,
-                    "src": "https://d3u63mhbhkevz8.cloudfront.net/common/neyson/business/neyson.png",
-                    "avatarType": "transparent",
-                    "animation": {
-                        "type": None,
-                        "exitType": None
-                    },
-                    "_exists": True,
-                    "visible": True
-                }
-            ]
-        },
-        "duration": 6.384
+@app.route("/generate", methods=["POST"])
+def generate():
+    payload = request.get_json() or {}
+    name     = payload.get("name",    "Generated Elai Video")
+    script   = payload.get("script",  "Hello from Elai!")
+    voice    = payload.get("voice",   "en-US-Wavenet-A")
+    language = payload.get("language","en")
+
+    # 1) Trigger creation
+    creation_payload = {
+        "name":     name,
+        "script":   script,
+        "avatarId": ELAI_AVATAR_ID,
+        "voice":    voice,
+        "language": language
     }
 
-@app.route('/generate', methods=['POST'])
-def generate():
-    try:
-        data = request.get_json() or {}
-        script_text = data.get("script", "Welcome to Elai! Type your script and click \"Render\" to generate your first video!")
-        video_name = data.get("name", "Generated Elai Video")
+    resp = requests.post(ELAI_API_URL, headers=HEADERS, json=creation_payload)
+    print("▶️ CREATE ▶", resp.status_code, resp.text)
 
-        payload = {
-            "name": video_name,
-            "slides": [build_slide(script_text)]
-        }
+    if resp.status_code != 200:
+        # Bail with the exact error from Elai
+        return abort(resp.status_code, resp.text)
 
-        # Step 1: Send creation request
-        response = requests.post(ELAI_API_URL, headers=headers, json=payload)
-        print("▶️ Elai API Request:", response.status_code, response.text)
-        try:
-            print("▶️ Elai API JSON:", response.json())
-        except Exception as e:
-            print("▶️ Could not decode JSON:", e)
+    data = resp.json()
+    # 2) Extract nested video.id
+    video_id = data.get("video", {}).get("id")
+    if not video_id:
+        print("❌ Creation response did not include video.id:", data)
+        return abort(500, "Missing video ID in Elai response")
 
-        if response.status_code != 200:
-            return jsonify({"error": response.text}), response.status_code
+    print(f"🎥 Created video ID={video_id}")
 
-        creation_data = response.json()
-        video_id = creation_data.get("video", {}).get("id")
-        if not video_id:
-            return jsonify({"error": "Could not retrieve video ID from creation response"}), 500
+    # 3) Poll status
+    status_url = f"{ELAI_API_URL}/{video_id}"
+    for _ in range(30):  # ~2.5 minutes max
+        st = requests.get(status_url, headers=HEADERS).json()
+        print("⌛ STATUS ▶", st.get("status"))
+        if st.get("status") == "completed":
+            video_url = st.get("videoUrl")
+            break
+        if st.get("status") == "failed":
+            return abort(500, "Elai reported generation failed")
+        time.sleep(5)
+    else:
+        return abort(500, "Video did not complete in time")
 
-        print(f"🎥 Created video with ID: {video_id}")
+    # 4) Stream back the MP4
+    video_data = requests.get(video_url)
+    if video_data.status_code != 200:
+        return abort(500, "Failed to download final video")
+    with open("output.mp4", "wb") as f:
+        f.write(video_data.content)
 
-        # Step 2: Poll for video completion
-        status_url = f"{ELAI_API_URL}/{video_id}"
+    return send_file("output.mp4", mimetype="video/mp4")
 
-        while True:
-            status_response = requests.get(status_url, headers=headers)
-            status_resp = status_response.json()
-            status = status_resp.get("status")
 
-            print(f"⌛ Status: {status}")
-
-            if status == "completed":
-                video_url = status_resp.get("videoUrl")
-                if not video_url:
-                    return jsonify({"error": "Video completed but no videoUrl found"}), 500
-                break
-            elif status == "failed":
-                return jsonify({"error": "Video generation failed"}), 500
-
-            time.sleep(5)
-
-        # Step 3: Download and return video
-        video_data = requests.get(video_url)
-        with open("elai_output.mp4", "wb") as f:
-            f.write(video_data.content)
-
-        return send_file("elai_output.mp4", mimetype='video/mp4')
-
-    except Exception as e:
-        print("❌ Error:", str(e))
-        return jsonify({"error": str(e)}), 500
-
-if __name__ == '__main__':
+if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
