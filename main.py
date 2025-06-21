@@ -1,51 +1,38 @@
-import os, time
-from flask import Flask, request, jsonify
+from flask import Flask, request, render_template, jsonify
 import requests
+import os
 
 app = Flask(__name__)
-API_KEY = os.getenv("CAPTION_AI_API_KEY")
-if not API_KEY:
-    raise RuntimeError("CAPTION_AI_API_KEY environment variable is required")
 
-HEADERS = {"x-api-key": API_KEY}
+# API key from environment variable with fallback for testing
+API_KEY = os.getenv('CAPTIONS_API_KEY', "b982e299-251f-4233-a813-dc491505a3df")
 
-@app.route("/list-creators", methods=["POST"])
-def list_creators():
-    resp = requests.post("https://api.captions.ai/api/creator/list", headers=HEADERS)
-    return jsonify(resp.json()), resp.status_code
+@app.route('/')
+def home():
+    return render_template('index.html')
 
-@app.route("/generate-video", methods=["POST"])
-def generate_video():
-    data = request.get_json()
-    script = data.get("script")
-    creator = data.get("creatorName")
-    if not script or not creator:
-        return jsonify({"error": "creatorName and script are required"}), 400
+@app.route('/generate', methods=['POST'])
+def generate_avatar():
+    # Extract text from form data
+    text = request.form.get('text')
+    if not text:
+        return jsonify({'error': 'Text is required'}), 400
 
-    # 1. Submit video generation job
-    sub = requests.post(
-        "https://api.captions.ai/api/creator/submit",
-        headers={**HEADERS, "Content-Type": "application/json"},
-        json={"creatorName": creator, "script": script}
-    ).json()
+    # Call captions.ai API
+    url = 'https://api.captions.ai/generate-avatar'
+    headers = {'Authorization': f'Bearer {API_KEY}'}
+    data = {'text': text}
+    
+    try:
+        response = requests.post(url, headers=headers, json=data, timeout=10)
+        response.raise_for_status()
+        video_url = response.json().get('video_url')
+        if not video_url:
+            return jsonify({'error': 'No video URL returned from API'}), 500
+        return jsonify({'video_url': video_url})
+    except requests.RequestException as e:
+        return jsonify({'error': f'API request failed: {str(e)}'}), 500
 
-    job_id = sub.get("operationId")
-    if not job_id:
-        return jsonify({"error": "Failed to start video generation", "details": sub}), 500
-
-    # 2. Poll until complete
-    while True:
-        status = requests.post(
-            "https://api.captions.ai/api/creator/poll",
-            headers={**HEADERS, "Content-Type": "application/json"},
-            json={"operationId": job_id}
-        ).json()
-        if status.get("url"):
-            return jsonify({"video_url": status["url"]})
-        if status.get("status") == "error":
-            return jsonify({"error": "Video generation failed"}), 500
-        time.sleep(2)
-
-if __name__ == "__main__":
-    port = int(os.getenv("PORT", 5000))
-    app.run(host="0.0.0.0", port=port)
+if __name__ == '__main__':
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host='0.0.0.0', port=port, debug=True)
