@@ -31,7 +31,7 @@ def render_video(video_id):
     if resp.status_code not in (200, 202):
         abort(resp.status_code, resp.text)
 
-def wait_video(video_id, timeout=150):
+def wait_video(video_id, timeout=900):
     status_url = f"https://apis.elai.io/api/v1/videos/{video_id}"
     for _ in range(timeout // 5):
         resp = requests.get(status_url, headers=HEADERS)
