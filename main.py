@@ -38,17 +38,15 @@ def generate():
         if response.status_code != 200:
             return jsonify({"error": response.text}), response.status_code
 
-        # Step 2: Wait 2 seconds before listing videos
-        time.sleep(2)
-        list_resp = requests.get(ELAI_API_URL, headers=headers).json()
+        # Get the video ID directly from the creation response
+        creation_data = response.json()
+        video_id = creation_data.get("id") or creation_data.get("videoId")
+        if not video_id:
+            return jsonify({"error": "Could not retrieve video ID from creation response"}), 500
 
-        if not list_resp or not isinstance(list_resp, list) or not list_resp[0].get("id"):
-            return jsonify({"error": "Could not retrieve video ID"}), 500
+        print(f"🎥 Created video with ID: {video_id}")
 
-        video_id = list_resp[0]["id"]
-        print(f"🎥 Fetched latest video ID: {video_id}")
-
-        # Step 3: Poll for video completion
+        # Step 2: Poll for video completion
         status_url = f"{ELAI_API_URL}/{video_id}"
 
         while True:
@@ -64,7 +62,7 @@ def generate():
             print(f"⌛ Status: {status}")
             time.sleep(5)
 
-        # Step 4: Download and return video
+        # Step 3: Download and return video
         video_data = requests.get(video_url)
         with open("elai_output.mp4", "wb") as f:
             f.write(video_data.content)
