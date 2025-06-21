@@ -5,7 +5,7 @@ from flask import Flask, request, jsonify, send_file, abort
 app = Flask(__name__)
 
 # Hardcode for now; move to os.getenv("ELAI_API_TOKEN") in prod
-ELAI_API_TOKEN = "PASTE_YOUR_ELAI_API_TOKEN_HERE"
+ELAI_API_TOKEN = "iJwxbNGxFTJ0X3W6dJj40LmtAkRwxKgl"
 ELAI_API_URL   = "https://apis.elai.io/api/v1/videos/render"
 ELAI_AVATAR_ID = "6282089e661f88f4779b815f"  # default avatar from docs
 
