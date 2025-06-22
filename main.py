@@ -25,7 +25,7 @@ def generate_avatar():
 
     app.logger.info(f'Sending request to {url} with text: {text}')
     try:
-        response = requests.post(url, headers=headers, json=data, timeout=10)
+        response = requests.post(url, headers=headers, json=data, timeout=200)
         response.raise_for_status()
         result = response.json()
         app.logger.info(f'API response: {result}')
