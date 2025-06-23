@@ -35,7 +35,7 @@ def generate_script_gemini(product_details):
 # --- Murf AI Functions (Ultra-Realistic TTS) ---
 def generate_murf_audio(text, voice_id="en-US-marcus"): # Default to a common Murf voice
     headers = {
-        "api-key": MURF_API_KEY,
+        "api-key": MURF_API_KEY, # Corrected: Murf AI uses 'api-key' header
         "Content-Type": "application/json"
     }
     data = {
@@ -45,10 +45,7 @@ def generate_murf_audio(text, voice_id="en-US-marcus"): # Default to a common Mu
     }
     response = requests.post(MURF_API_URL, headers=headers, json=data)
     response.raise_for_status()
-    # IMPORTANT CHANGE: We no longer return response.content if it's not used later.
-    # This prevents holding large binary audio data in memory.
-    # If you needed to upload this audio to cloud storage, you would handle it here.
-    pass # Simply pass, as the response.raise_for_status() confirms success
+    pass # No longer returning content to save memory
 
 # --- Masterpiece X Functions (3D Product Animation) ---
 def generate_masterpiecex_3d_model(product_description, image_url=None):
@@ -127,7 +124,7 @@ def generate_video():
 
         # 2. Generate Ultra-Realistic TTS Audio (using Murf AI)
         print("\nGenerating audio with Murf AI...")
-        generate_murf_audio(generated_script) # IMPORTANT CHANGE: No longer assigning to audio_content
+        generate_murf_audio(generated_script)
         print("Audio content generated successfully.")
 
         # 3. Generate 3D Product Animation (Masterpiece X)
