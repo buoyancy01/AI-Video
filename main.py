@@ -14,7 +14,7 @@ app = Flask(__name__)
 MASTERPIECEX_APP_ID = os.getenv("MASTERPIECEX_APP_ID")
 MASTERPIECEX_API_KEY = os.getenv("MASTERPIECEX_API_KEY")
 CREATOMATE_API_KEY = os.getenv("CREATOMATE_API_KEY")
-ELEVENLABS_API_KEY = os.getenv("ELEVENLABS_API_KEY")
+MURF_API_KEY = os.getenv("MURF_API_KEY") # Changed from ELEVENLABS_API_KEY
 GOOGLE_GEMINI_API_KEY = os.getenv("GOOGLE_GEMINI_API_KEY")
 
 # Configure Google Gemini API
@@ -23,7 +23,7 @@ genai.configure(api_key=GOOGLE_GEMINI_API_KEY)
 # API Endpoints
 MASTERPIECEX_API_URL = "https://api.masterpiecex.com/v1/generate"
 CREATOMATE_API_URL = "https://api.creatomate.com/v1/renders"
-ELEVENLABS_API_URL = "https://api.elevenlabs.io/v1/text-to-speech/"
+MURF_API_URL = "https://api.murf.ai/v1/speech/generate" # Updated to Murf AI endpoint
 
 # --- Google Gemini API Functions (Auto-Generated Scripts) ---
 def generate_script_gemini(product_details):
@@ -32,23 +32,20 @@ def generate_script_gemini(product_details):
     response = model.generate_content(prompt)
     return response.text
 
-# --- ElevenLabs Functions (Ultra-Realistic TTS) ---
-def generate_elevenlabs_audio(text, voice_id="EXAVITQu4vr4xnSDxMaL"):
+# --- Murf AI Functions (Ultra-Realistic TTS) ---
+def generate_murf_audio(text, voice_id="en-US-marcus"): # Default to a common Murf voice
     headers = {
-        "Accept": "audio/mpeg",
-        "Content-Type": "application/json",
-        "xi-api-key": ELEVENLABS_API_KEY
+        "Authorization": f"Bearer {MURF_API_KEY}", # Murf AI uses Bearer token
+        "Content-Type": "application/json"
     }
     data = {
         "text": text,
-        "model_id": "eleven_monolingual_v1",
-        "voice_settings": {
-            "stability": 0.5,
-            "similarity_boost": 0.75
-        }
+        "voiceId": voice_id,
+        "format": "MP3" # Request MP3 format
     }
-    response = requests.post(f"{ELEVENLABS_API_URL}{voice_id}", headers=headers, json=data)
+    response = requests.post(MURF_API_URL, headers=headers, json=data)
     response.raise_for_status()
+    # Murf AI returns the audio file directly in the response content
     return response.content
 
 # --- Masterpiece X Functions (3D Product Animation) ---
@@ -126,9 +123,9 @@ def generate_video():
         generated_script = generate_script_gemini(product_details)
         print(f"Generated Script: {generated_script}")
 
-        # 2. Generate Ultra-Realistic TTS Audio
-        print("\nGenerating audio with ElevenLabs...")
-        audio_content = generate_elevenlabs_audio(generated_script)
+        # 2. Generate Ultra-Realistic TTS Audio (using Murf AI)
+        print("\nGenerating audio with Murf AI...")
+        audio_content = generate_murf_audio(generated_script) # Changed function call
         # In a web service, you might want to save this to a temporary file or cloud storage
         # For now, we'll just confirm its generation.
         # with open("output_audio.mp3", "wb") as f:
@@ -210,7 +207,5 @@ def generate_video():
         return jsonify({"status": "error", "message": error_message}), 500
 
 if __name__ == '__main__':
-    # Render provides the PORT environment variable
     port = int(os.environ.get("PORT", 5000))
     app.run(host='0.0.0.0', port=port)
-
