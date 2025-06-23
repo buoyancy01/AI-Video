@@ -14,7 +14,7 @@ app = Flask(__name__)
 MASTERPIECEX_APP_ID = os.getenv("MASTERPIECEX_APP_ID")
 MASTERPIECEX_API_KEY = os.getenv("MASTERPIECEX_API_KEY")
 CREATOMATE_API_KEY = os.getenv("CREATOMATE_API_KEY")
-MURF_API_KEY = os.getenv("MURF_API_KEY") # Changed from ELEVENLABS_API_KEY
+MURF_API_KEY = os.getenv("MURF_API_KEY")
 GOOGLE_GEMINI_API_KEY = os.getenv("GOOGLE_GEMINI_API_KEY")
 
 # Configure Google Gemini API
@@ -23,7 +23,7 @@ genai.configure(api_key=GOOGLE_GEMINI_API_KEY)
 # API Endpoints
 MASTERPIECEX_API_URL = "https://api.masterpiecex.com/v1/generate"
 CREATOMATE_API_URL = "https://api.creatomate.com/v1/renders"
-MURF_API_URL = "https://api.murf.ai/v1/speech/generate" # Updated to Murf AI endpoint
+MURF_API_URL = "https://api.murf.ai/v1/speech/generate"
 
 # --- Google Gemini API Functions (Auto-Generated Scripts) ---
 def generate_script_gemini(product_details):
@@ -35,17 +35,16 @@ def generate_script_gemini(product_details):
 # --- Murf AI Functions (Ultra-Realistic TTS) ---
 def generate_murf_audio(text, voice_id="en-US-marcus"): # Default to a common Murf voice
     headers = {
-        "Authorization": f"Bearer {MURF_API_KEY}", # Murf AI uses Bearer token
+        "api-key": MURF_API_KEY, # Corrected: Murf AI uses 'api-key' header
         "Content-Type": "application/json"
     }
     data = {
         "text": text,
         "voiceId": voice_id,
-        "format": "MP3" # Request MP3 format
+        "format": "MP3"
     }
     response = requests.post(MURF_API_URL, headers=headers, json=data)
     response.raise_for_status()
-    # Murf AI returns the audio file directly in the response content
     return response.content
 
 # --- Masterpiece X Functions (3D Product Animation) ---
@@ -125,11 +124,7 @@ def generate_video():
 
         # 2. Generate Ultra-Realistic TTS Audio (using Murf AI)
         print("\nGenerating audio with Murf AI...")
-        audio_content = generate_murf_audio(generated_script) # Changed function call
-        # In a web service, you might want to save this to a temporary file or cloud storage
-        # For now, we'll just confirm its generation.
-        # with open("output_audio.mp3", "wb") as f:
-        #     f.write(audio_content)
+        audio_content = generate_murf_audio(generated_script)
         print("Audio content generated successfully.")
 
         # 3. Generate 3D Product Animation (Masterpiece X)
